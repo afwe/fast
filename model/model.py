@@ -1,7 +1,7 @@
 import torch
 from model.backbone import resnet
 import numpy as np
-
+from model.attention.modules.block import BiLevelRoutingAttention 
 class conv_bn_relu(torch.nn.Module):
     def __init__(self,in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1,bias=False):
         super(conv_bn_relu,self).__init__()
@@ -30,7 +30,8 @@ class parsingNet(torch.nn.Module):
         # input : nchw,
         # output: (w+1) * sample_rows * 4 
         self.model = resnet(backbone, pretrained=pretrained)
-
+        self.biLevel128 = BiLevelRoutingAttention(128)
+        self.biLevel256 = BiLevelRoutingAttention(256)
         if self.use_aux:
             self.aux_header2 = torch.nn.Sequential(
                 conv_bn_relu(128, 128, kernel_size=3, stride=1, padding=1) if backbone in ['34','18'] else conv_bn_relu(512, 128, kernel_size=3, stride=1, padding=1),
@@ -74,6 +75,8 @@ class parsingNet(torch.nn.Module):
         # n c h w - > n 2048 sh sw
         # -> n 2048
         x2,x3,fea = self.model(x)
+        x2=self.biLevel128(x2)
+        x3=self.biLevel256(x3)
         if self.use_aux:
             x2 = self.aux_header2(x2)
             x3 = self.aux_header3(x3)
